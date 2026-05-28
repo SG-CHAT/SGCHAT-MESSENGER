@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SG CHAT</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, sans-serif; background: #F3F4F6; height: 100vh; }
+        .screen { display: none; height: 100%; }
+        .active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        #regScreen { background: linear-gradient(135deg, #667eea, #764ba2); padding: 20px; }
+        .box { background: white; border-radius: 24px; padding: 32px; max-width: 400px; width: 100%; box-shadow: 0 10px 20px rgba(0,0,0,0.2); text-align: center; }
+        .logo { width: 100px; height: 100px; background: #4F46E5; border-radius: 24px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; color: white; font-size: 48px; font-weight: bold; }
+        h1 { margin-bottom: 8px; }
+        p { color: #666; margin-bottom: 24px; }
+        input { width: 100%; padding: 16px; font-size: 18px; border: 2px solid #ddd; border-radius: 12px; margin-bottom: 20px; }
+        button { width: 100%; padding: 16px; background: #4F46E5; color: white; border: none; border-radius: 12px; font-size: 20px; font-weight: bold; cursor: pointer; }
+        button:disabled { background: #999; }
+        #chatScreen { background: #F3F4F6; display: none; flex-direction: column; height: 100vh; }
+        #chatScreen.active { display: flex; }
+        .header { background: white; padding: 16px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .header .logo { width: 44px; height: 44px; font-size: 24px; margin: 0; }
+        .messages { flex: 1; overflow-y: auto; padding: 20px; }
+        .msg { margin-bottom: 12px; max-width: 80%; }
+        .msg.sent { margin-left: auto; text-align: right; }
+        .bubble { display: inline-block; padding: 12px 16px; border-radius: 16px; background: white; }
+        .sent .bubble { background: #4F46E5; color: white; }
+        .name { font-size: 12px; color: #666; margin-bottom: 4px; }
+        .time { font-size: 10px; color: #999; margin-top: 4px; }
+        .input-area { background: white; padding: 16px; display: flex; gap: 8px; }
+        .input-area input { flex: 1; margin: 0; border-radius: 24px; }
+        .input-area button { width: 50px; height: 50px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; }
+    </style>
+</head>
+<body>
+    <div id="regScreen" class="screen active">
+        <div class="box">
+            <div class="logo">SG</div>
+            <h1>SG CHAT</h1>
+            <p>Семейный чат</p>
+            <input type="text" id="nameInput" placeholder="Ваше имя">
+            <button id="joinBtn">Войти</button>
+        </div>
+    </div>
+
+    <div id="chatScreen" class="screen">
+        <div class="header">
+            <div class="logo">SG</div>
+            <div>
+                <h2>SG CHAT</h2>
+                <small id="status">Загрузка...</small>
+            </div>
+        </div>
+        <div class="messages" id="messages"></div>
+        <div class="input-area">
+            <input type="text" id="msgInput" placeholder="Сообщение...">
+            <button id="sendBtn">
+                <svg width="20" height="20" viewBox="0 0 24 24"><path d="M2 21L23 12L2 3V10L17 12L2 14V21Z" fill="currentColor"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // Используем уникальное имя, конфликтов нет
+        const _sgClient = window.supabase.createClient(
+            'https://sfsxflsbueyotiksqknp.supabase.co',
+            'sb_publishable_32wqroL1fDtPIVwHbvZtIg_5Hipzmdj'
+        );
+
+        const regScreen = document.getElementById('regScreen');
+        const chatScreen = document.getElementById('chatScreen');
+        const nameInput = document.getElementById('nameInput');
+        const joinBtn = document.getElementById('joinBtn');
+        const messagesDiv = document.getElementById('messages');
+        const msgInput = document.getElementById('msgInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const statusDiv = document.getElementById('status');
+
+        let currentUser = null;
+
+        joinBtn.addEventListener('click', async () => {
+            const name = nameInput.value.trim();
+            if (!name) return;
+            joinBtn.disabled = true;
+            joinBtn.textContent = 'Вход...';
+            try {
+                const { data: users } = await _sgClient.from('users').select('*').eq('name', name).limit(1);
+                let user;
+                if (users && users.length > 0) {
+                    user = users[0];
+                    await _sgClient.from('users').update({ last_seen: new Date() }).eq('id', user.id);
+                } else {
+                    const { data: newUser, error } = await _sgClient.from('users').insert({ name, email: null }).select().single();
+                    if (error) throw error;
+                    user = newUser;
+                }
+                currentUser = user;
+                localStorage.setItem('sgchat_user', JSON.stringify(user));
+                regScreen.classList.remove('active');
+                chatScreen.classList.add('active');
+                loadMessages();
+                subscribeMessages();
+                msgInput.focus();
+            } catch (err) {
+                alert('Ошибка: ' + err.message);
+                joinBtn.disabled = false;
+                joinBtn.textContent = 'Войти';
+            }
+        });
+
+        async function loadMessages() {
+            const { data, error } = await _sgClient.from('messages').select('*').order('created_at', { ascending: true }).limit(100);
+            if (error) { console.error(error); return; }
+            messagesDiv.innerHTML = '';
+            data.forEach(msg => renderMessage(msg));
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function renderMessage(msg) {
+            const div = document.createElement('div');
+            div.className = 'msg' + (msg.user_id === currentUser?.id ? ' sent' : '');
+            div.innerHTML = 
+                (msg.user_id !== currentUser?.id ? `<div class="name">${escapeHtml(msg.user_name)}</div>` : '') +
+                `<div class="bubble">${escapeHtml(msg.text)}</div>` +
+                `<div class="time">${formatTime(msg.created_at)}</div>`;
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function subscribeMessages() {
+            _sgClient.channel('public:messages')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+                    if (currentUser) renderMessage(payload.new);
+                })
+                .subscribe();
+        }
+
+        sendBtn.addEventListener('click', async () => {
+            const text = msgInput.value.trim();
+            if (!text || !currentUser) return;
+            sendBtn.disabled = true;
+            const { error } = await _sgClient.from('messages').insert({
+                user_id: currentUser.id,
+                user_name: currentUser.name,
+                text
+            });
+            if (error) { alert('Ошибка отправки'); }
+            else { msgInput.value = ''; }
+            sendBtn.disabled = false;
+            msgInput.focus();
+        });
+
+        msgInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendBtn.click(); });
+
+        function formatTime(ts) {
+            const d = new Date(ts);
+            return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+        }
+
+        function escapeHtml(text) {
+            const el = document.createElement('div');
+            el.textContent = text;
+            return el.innerHTML;
+        }
+
+        // Автовход
+        const saved = localStorage.getItem('sgchat_user');
+        if (saved) {
+            const user = JSON.parse(saved);
+            _sgClient.from('users').select('*').eq('id', user.id).single().then(({ data }) => {
+                if (data) {
+                    currentUser = data;
+                    regScreen.classList.remove('active');
+                    chatScreen.classList.add('active');
+                    loadMessages();
+                    subscribeMessages();
+                } else {
+                    localStorage.removeItem('sgchat_user');
+                }
+            });
+        }
+    </script>
+</body>
+</html>
