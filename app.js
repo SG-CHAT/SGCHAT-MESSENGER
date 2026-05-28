@@ -193,8 +193,9 @@ registrationForm.addEventListener('submit', async e => {
         subscribeToMessages();
         subscribeToPresence();
         messageInput.focus();
-    } catch (err) {
-        alert('Ошибка входа. Попробуйте ещё раз.');
+    } catch (err) { 
+        console.error('Ошибка входа:', err);
+        alert('Ошибка входа: ' + (err.message || JSON.stringify(err)));
         joinButton.disabled = false;
         joinButton.classList.remove('loading');
         joinButton.innerHTML = '<span>Войти в SG CHAT</span><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M7.5 15L12.5 10L7.5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
