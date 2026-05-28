@@ -1,6 +1,6 @@
 const SUPABASE_URL = 'https://sfsxflsbueyotiksqknp.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_32wqroL1fDtPIVwHbvZtIg_5Hipzmdj';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
 let messageSubscription = null;
@@ -221,7 +221,7 @@ async function checkExistingSession() {
     if (!saved) return;
     try {
         const user = JSON.parse(saved);
-        const { data, error } = await supabase.from('users').select('*').eq('id', user.id).single();
+        const { data, error } = await _supabase.from('users').select('*').eq('id', user.id).single();
         if (error || !data) { localStorage.removeItem('sgchat_user'); return; }
         currentUser = data;
         localStorage.setItem('sgchat_user', JSON.stringify(data));
