@@ -131,7 +131,6 @@ function updateOnlineStatus(count) {
 }
 
 async function registerUser(name) {
-    // Ищем первого пользователя с таким именем
     const { data: existingUsers, error: selectError } = await supabase
         .from('users')
         .select('*')
@@ -238,10 +237,6 @@ async function checkExistingSession() {
 }
 
 async function initApp() {
-    if (SUPABASE_URL === 'YOUR_SUPABASE_URL' || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY') {
-        document.querySelector('.app-subtitle').textContent = 'Настройте подключение к Supabase';
-        return;
-    }
     await checkExistingSession();
 }
 initApp();
