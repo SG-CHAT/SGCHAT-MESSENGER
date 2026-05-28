@@ -1,6 +1,3 @@
-const SUPABASE_URL = 'https://sfsxflsbueyotiksqknp.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_32wqroL1fDtPIVwHbvZtIg_5Hipzmdj';
-const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
 let messageSubscription = null;
